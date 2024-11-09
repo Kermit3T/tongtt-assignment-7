@@ -222,7 +222,7 @@
             <button type="submit">Generate Data</button>
         </form>
 
-        {% if plot1 and data_generated %}
+        {% if plot1 and data_generated and request.method == 'POST' %}
         <div class="result-section">
             <h2>Data Generation Results</h2>
             

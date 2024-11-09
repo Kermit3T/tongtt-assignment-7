@@ -8,6 +8,8 @@ from scipy import stats
 from datetime import timedelta
 from flask_session import Session
 import logging
+import os
+import shutil   
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key_here"
@@ -19,7 +21,7 @@ Session(app)
 @app.before_request
 def before_request():
     session.permanent = True
-
+    
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -36,6 +38,25 @@ def create_response(template, **kwargs):
         "frame-src 'self'"
     )
     return response
+
+def clear_session_and_plots():
+    # Clear session
+    if 'data_generated' in session:
+        session.clear()
+    
+    # Clear static plots
+    plot_files = ['plot1.png', 'plot2.png', 'plot3.png', 'plot4.png']
+    for file in plot_files:
+        file_path = os.path.join('static', file)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Error removing {file}: {e}")
+
+# Ensure static directory exists
+if not os.path.exists('static'):
+    os.makedirs('static')
 
 def generate_data(N, mu, beta0, beta1, sigma2, S):
     # Generate initial dataset
@@ -129,88 +150,68 @@ def calculate_p_value(simulated_stats, observed_stat, hypothesized_value, test_t
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    print("Index route accessed")
-    print("Current session data:", dict(session))
-    print("Request method:", request.method)
-    
-    if request.method == "POST":
-        print("Processing POST request")
-        try:
-            # Get form data
-            form_data = {
-                "N": int(request.form["N"]),
-                "mu": float(request.form["mu"]),
-                "sigma2": float(request.form["sigma2"]),
-                "beta0": float(request.form["beta0"]),
-                "beta1": float(request.form["beta1"]),
-                "S": int(request.form["S"])
-            }
-            print("Form data received:", form_data)
+    # Clear everything on GET request
+    if request.method == "GET":
+        clear_session_and_plots()
+        return create_response(
+            "index.html", 
+            data_generated=False,
+            plot1=None,
+            plot2=None,
+            plot3=None,
+            plot4=None
+        )
 
-            # Generate data
-            (X, Y, slope, intercept, plot1, plot2, slope_extreme, intercept_extreme,
-             slopes, intercepts) = generate_data(**form_data)
+    print("Processing POST request")
+    try:
+        # Get form data
+        form_data = {
+            "N": int(request.form["N"]),
+            "mu": float(request.form["mu"]),
+            "sigma2": float(request.form["sigma2"]),
+            "beta0": float(request.form["beta0"]),
+            "beta1": float(request.form["beta1"]),
+            "S": int(request.form["S"])
+        }
+        print("Form data received:", form_data)
 
-            # Update session data
-            session_data = {
-                "X": X.tolist(),
-                "Y": Y.tolist(),
-                "slope": float(slope),
-                "intercept": float(intercept),
-                "slopes": slopes,
-                "intercepts": intercepts,
-                "slope_extreme": float(slope_extreme),
-                "intercept_extreme": float(intercept_extreme),
-                **form_data,
-                "data_generated": True
-            }
-            
-            # Update session
-            for key, value in session_data.items():
-                session[key] = value
-            
-            print("Updated session data:", dict(session))
+        # Generate data
+        (X, Y, slope, intercept, plot1, plot2, slope_extreme, intercept_extreme,
+         slopes, intercepts) = generate_data(**form_data)
 
-            return create_response(
-                "index.html",
-                plot1=plot1,
-                plot2=plot2,
-                slope_extreme=slope_extreme,
-                intercept_extreme=intercept_extreme,
-                **form_data,
-                data_generated=True
-            )
-        except Exception as e:
-            print(f"Error in index POST: {str(e)}")
-            return create_response("index.html", error=str(e))
-
-    # For GET requests
-    if session.get("data_generated"):
-            print("Returning existing session data")
-            return create_response(
-                "index.html",
-                plot1="static/plot1.png",
-                plot2="static/plot2.png",
-                slope_extreme=session.get("slope_extreme"),
-                intercept_extreme=session.get("intercept_extreme"),
-                N=session.get("N"),
-                mu=session.get("mu"),
-                sigma2=session.get("sigma2"),
-                beta0=session.get("beta0"),
-                beta1=session.get("beta1"),
-                S=session.get("S"),
-                data_generated=True
-            )
+        # Update session data
+        session_data = {
+            "X": X.tolist(),
+            "Y": Y.tolist(),
+            "slope": float(slope),
+            "intercept": float(intercept),
+            "slopes": slopes,
+            "intercepts": intercepts,
+            "slope_extreme": float(slope_extreme),
+            "intercept_extreme": float(intercept_extreme),
+            **form_data,
+            "data_generated": True
+        }
         
-    print("No session data, returning empty form")
-    return create_response(
-        "index.html", 
-        data_generated=False,
-        plot1=None,
-        plot2=None,
-        plot3=None,
-        plot4=None
-    )
+        # Update session
+        for key, value in session_data.items():
+            session[key] = value
+        
+        print("Updated session data:", dict(session))
+
+        return create_response(
+            "index.html",
+            plot1=plot1,
+            plot2=plot2,
+            slope_extreme=slope_extreme,
+            intercept_extreme=intercept_extreme,
+            **form_data,
+            data_generated=True
+        )
+    except Exception as e:
+        print(f"Error in index POST: {str(e)}")
+        clear_session_and_plots()
+        return create_response("index.html", error=str(e))
 
 @app.route("/hypothesis_test", methods=["POST"])
 def hypothesis_test():
@@ -409,6 +410,9 @@ def confidence_interval():
     except Exception as e:
         print(f"Error in confidence_interval: {str(e)}")
         return redirect(url_for("index"))
+
+def before_first_request():
+    clear_session_and_plots()
 
 if __name__ == "__main__":
     app.run(debug=True)
