@@ -101,13 +101,13 @@ def generate_data(N, mu, beta0, beta1, sigma2, S):
     # Plot histograms
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
     
-    ax1.hist(slopes, bins=30, alpha=0.7, color='blue')
+    ax1.hist(slopes, bins=30, alpha=0.7, density=True, color='blue')  # Added density=True
     ax1.axvline(slope, color='red', linestyle='dashed', label='Observed')
     ax1.axvline(beta1, color='green', linestyle='dashed', label='True')
     ax1.set_title('Distribution of Slopes')
     ax1.legend()
     
-    ax2.hist(intercepts, bins=30, alpha=0.7, color='blue')
+    ax2.hist(intercepts, bins=30, alpha=0.7, density=True, color='blue')  # Added density=True
     ax2.axvline(intercept, color='red', linestyle='dashed', label='Observed')
     ax2.axvline(beta0, color='green', linestyle='dashed', label='True')
     ax2.set_title('Distribution of Intercepts')
